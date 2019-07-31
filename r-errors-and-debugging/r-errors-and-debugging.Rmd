@@ -1,0 +1,109 @@
+---
+title: "Errors and Debugging in RStudio"
+author: "Caleb Scheidel"
+date: "2019/08/02"
+output:
+  xaringan::moon_reader:
+    css: ["mc-xaringan.css", "mc-xaringan-fonts.css"]
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+editor_options: 
+  chunk_output_type: console
+---
+
+layout: true
+background-color: #fafaef
+<div class="my-footer"><img src="mc_logo_rectangle.png" style="height: 30px;"/></div>
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(knitr)
+```
+
+---
+
+## Errors ~ Frustration
+
+- Diagnosing and fixing errors in your code can be time-consuming and frustrating
+
+- Two ways we can make our lives easier
+    1. Knowing the tools at our disposal in RStudio to debug errors
+        - Diagnose the problem at the source and come up with a solution
+    2. Writing functions that return clear yet detailed errors
+        - Always think about future you and others
+
+---
+
+## Example Data
+
+```{r}
+(treatment <- tibble::tibble(
+  treatment = c(rep("old", 50), rep("new", 50)),
+  gender    = c(rep("male", 30), rep("female", 20),
+                rep("male", 20), rep("female", 30)),
+  outcome   = c(rep("failure", 95), rep("success", 5))
+))
+```
+
+---
+
+## Example Function
+
+```{r}
+library(chifishr)
+
+# warning is present, Fisher p-value is returned
+chi_fisher_p(treatment, "outcome", "treatment")
+
+# no warning is present, Chi-squared p-value returned
+chi_fisher_p(treatment, "gender", "treatment")
+```
+
+---
+
+## traceback()
+
+If an error occurs, the `traceback()` function can be very helpful to debug the source of the error.
+
+```{r, eval = FALSE}
+chi_fisher_p(treatment, "sex", "treatment")
+traceback()
+```
+
+---
+
+## debug()
+
+The `debug()` or `debugonce()` functions can be used to turn on the "debugging state" of a function. 
+
+```{r, eval = FALSE}
+
+debugonce(chi_fisher_p)
+```
+
+It is important not to be too dependent on the debugger, as it can become very complex and span many lines in your code.
+
+---
+
+## Breakpoints
+
+The `browser()` function invokes an environment browser to open at that point in your code.
+
+```{r, eval = FALSE}
+
+browser()
+```
+
+---
+
+## Resources
+
+- [Debugging chapter in _Advanced R_](https://adv-r.hadley.nz/debugging.html)
+- [Debugging, condition handling, and defensive programming by Hadley Wickham](http://adv-r.had.co.nz/Exceptions-Debugging.html)
+- [Error Handling and Generation chapter in _Mastering Software Development in R_](https://bookdown.org/rdpeng/RProgDA/error-handling-and-generation.html) 
+- [RStudio Support Debugging Documentation](https://support.rstudio.com/hc/en-us/articles/205612627-Debugging-with-RStudio)
