@@ -1,7 +1,7 @@
 ---
 title: "Errors and Debugging in RStudio"
 author: "Caleb Scheidel"
-date: "2019/08/02"
+date: "2019/08/09"
 output:
   xaringan::moon_reader:
     css: ["mc-xaringan.css", "mc-xaringan-fonts.css"]
@@ -121,7 +121,7 @@ If the location of the error from `traceback` is not enough, try the interactive
   2. `debug()` or `debugonce()`
   
 - Puts you in an interactive environment _inside_ the function where you can run code to explore the current state with the inputs used.  You're in the interactive debugger when you get the special prompt: `Browse[1]>`
-  - Code is in a new editor windw
+  - Code is in a new editor window
   - Objects in the current environment are in the Environment pane
   
 ---
@@ -218,7 +218,7 @@ In practice, we usually write functions that call other functions and it can get
 ## define get_val() to simulate random input values,
 ## raise an error if negative
 get_val <- function(){
-  val <- runif(1, -10, 10)
+  val <- runif(1, -10, 0)
   if (val < 1){
     stop("Can't get val")
   } else {
@@ -257,7 +257,7 @@ Note that the condition returned shows no info about the value of `val` that cau
 
 ```{r}
 get_val <- function(){
-  val <- runif(1, -10, 10)
+  val <- runif(1, -10, 0)
   if (val < 1){
     rlang::abort(message = "Can't get val", 
                  .subclass ="get_val_error", 
@@ -325,6 +325,14 @@ mult_val <- function(mult_by = 2){
 ```
 
 ![](mult-val-error.png)
+
+---
+
+## Advantages of Condition Handling in `rlang`
+
+- Ability to store metadata which can be examined by handlers
+- More detailed messages can be output to the end user
+- Unhandled errors are automatically saved by `abort()`
 
 ---
 

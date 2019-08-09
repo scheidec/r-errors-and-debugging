@@ -13,7 +13,7 @@ class: center, middle, inverse, title-slide
 
 # Errors and Debugging in RStudio
 ### Caleb Scheidel
-### 2019/08/02
+### 2019/08/09
 
 ---
 
@@ -126,7 +126,7 @@ If the location of the error from `traceback` is not enough, try the interactive
   2. `debug()` or `debugonce()`
   
 - Puts you in an interactive environment _inside_ the function where you can run code to explore the current state with the inputs used.  You're in the interactive debugger when you get the special prompt: `Browse[1]&gt;`
-  - Code is in a new editor windw
+  - Code is in a new editor window
   - Objects in the current environment are in the Environment pane
   
 ---
@@ -227,7 +227,7 @@ In practice, we usually write functions that call other functions and it can get
 ## define get_val() to simulate random input values,
 ## raise an error if negative
 get_val &lt;- function(){
-  val &lt;- runif(1, -10, 10)
+  val &lt;- runif(1, -10, 0)
   if (val &lt; 1){
     stop("Can't get val")
   } else {
@@ -264,7 +264,7 @@ Note that the condition returned shows no info about the value of `val` that cau
 
 ```r
 get_val &lt;- function(){
-  val &lt;- runif(1, -10, 10)
+  val &lt;- runif(1, -10, 0)
   if (val &lt; 1){
     rlang::abort(message = "Can't get val", 
                  .subclass ="get_val_error", 
@@ -296,7 +296,13 @@ str(custom_cnd, max.level = 1)
 ```
 
 ```
-##  num 1.17
+## List of 4
+##  $ message: chr "Can't get val"
+##  $ trace  :List of 4
+##   ..- attr(*, "class")= chr "rlang_trace"
+##  $ parent : NULL
+##  $ val    : num -9.75
+##  - attr(*, "class")= chr [1:4] "get_val_error" "rlang_error" "error" "condition"
 ```
 
 We see the metadata value of `val` as well as the subclass is captured in the function that uses `rlang::abort()`. 
@@ -339,6 +345,14 @@ mult_val &lt;- function(mult_by = 2){
 ```
 
 ![](mult-val-error.png)
+
+---
+
+## Advantages of Condition Handling in `rlang`
+
+- Ability to store metadata which can be examined by handlers
+- More detailed messages can be output to the end user
+- Unhandled errors are automatically saved by `abort()`
 
 ---
 
