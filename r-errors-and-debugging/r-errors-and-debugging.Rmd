@@ -35,26 +35,50 @@ library(knitr)
     1. Knowing the tools at our disposal in RStudio to debug errors
         - Diagnose the problem at the source and come up with a solution
     2. Writing functions that return clear yet detailed errors
-        - Always think about future you and others
 
 ---
 
-## Example Data
+## Debugging - General Strategy
 
-```{r}
-(treatment <- tibble::tibble(
-  treatment = c(rep("old", 50), rep("new", 50)),
-  gender    = c(rep("male", 30), rep("female", 20),
-                rep("male", 20), rep("female", 30)),
-  outcome   = c(rep("failure", 95), rep("success", 5))
-))
-```
+1. Google
+  - Many times it is a common error with a known solution
+2. Make it repeatable
+  - Create a minimal, reproducible example (e.g. `reprex`) using simple data
+  - Note which inputs don't trigger the error
+  - If not already done, write simple tests to reduce chances of creating a new bug
+3. Figure out where it is
+  - Use "scientific method"
+    - Hypothesize, test with experiments, record results
+  - If needed, ask someone else for a second pair of eyes to review
+4. Fix it and test it
+
+---
+
+## Debugging - Locating Errors
+
+Where is the code not behaving where you expect?  
+
+1. Begin running the code
+2. Stop the code where you suspect the bug/problem is arising
+3. Look and and/or walk through the code, step-by-step at that point
+
+This can be done ad-hoc in a separate R script containing the function code, or using several built-in tools in RStudio.
+- `traceback`
+- `debug` mode
 
 ---
 
 ## Example Function
 
 ```{r}
+treatment <- tibble::tibble(
+  treatment = c(rep("old", 50), rep("new", 50)),
+  gender    = c(rep("male", 30), rep("female", 20),
+                rep("male", 20), rep("female", 30)),
+  outcome   = c(rep("failure", 95), rep("success", 5))
+)
+
+# devtools::install_git("https://gitlab.com/scheidec/chifishr")
 library(chifishr)
 
 # warning is present, Fisher p-value is returned
@@ -68,36 +92,239 @@ chi_fisher_p(treatment, "gender", "treatment")
 
 ## traceback()
 
-If an error occurs, the `traceback()` function can be very helpful to debug the source of the error.
+If an error occurs, the "Show Traceback" feature in RStudio or the `traceback()` function can be very helpful to debug the source of the error.
 
-```{r, eval = FALSE}
+```{r, include = FALSE, eval = FALSE}
 chi_fisher_p(treatment, "sex", "treatment")
 traceback()
 ```
 
+![](error-1.png)
 ---
 
-## debug()
+## rlang::last_trace()
 
-The `debug()` or `debugonce()` functions can be used to turn on the "debugging state" of a function. 
+An alternative to `traceback()`, `rlang::last_trace()` is ordered in the opposite way and shows the hierarchical structure of the call stack.
 
-```{r, eval = FALSE}
+```{r, include = FALSE, eval = FALSE}
+rlang::last_trace()
+```
+
+![](last-trace.png)
+---
+
+## Interactive Debugger
+
+If the location of the error from `traceback` is not enough, try the interactive debugger, which pauses execution of the function and allows you to interactively explore its state.
+- Options to enter the interactive debugger:
+  1. RStudio's "Rerun with Debug" tool
+  2. `debug()` or `debugonce()`
+  
+- Puts you in an interactive environment _inside_ the function where you can run code to explore the current state with the inputs used.  You're in the interactive debugger when you get the special prompt: `Browse[1]>`
+  - Code is in a new editor windw
+  - Objects in the current environment are in the Environment pane
+  
+---
+
+## Interactive Debugger
+  
+```{r, eval = FALSE, include = FALSE}
 
 debugonce(chi_fisher_p)
+chi_fisher_p(treatment, "sex", "treatment")
 ```
 
-It is important not to be too dependent on the debugger, as it can become very complex and span many lines in your code.
+![](debugger.png)
 
 ---
 
-## Breakpoints
+## Debugger Toolbar
 
-The `browser()` function invokes an environment browser to open at that point in your code.
+In debug mode, a toolbar containing special commands pops up in the console which can be used in addition to running regular R code:
 
-```{r, eval = FALSE}
+![](toolbar.png)
 
-browser()
+- _Next_: executes the next line in the function
+- _Step into_: works like Next, but if the next step is a function, it will step into that function to be explored interactively.
+- _Finish_: finishes execution of the current loop or function
+- _Continue_: leaves interactive debugger and continues regular execution of the function
+  - Useful if you've fixed the bad state and want to check that the function correctly executes the remaining code
+- _Stop_: stops debugger, terminates the function and returns to the global workspace
+
+---
+
+## Non-error Bugs
+
+A function may generate an unexpected warning or message.  To diagnose where these are thrown, the easiest way is to convert them to errors using:
+- `options(warn = 2)` for warnings
+- `rlang::with_abort(function, "message")` for messages 
+
+and then use regular debugging tools.
+
+---
+
+## Condition Handling
+
+Now that we know how to locate and fix problems in R code, we should know the recommended ways of writing functions to communicate problems to the user as clearly as possible.  This is the job of _conditions_:
+
+- Errors - raised by `stop()` or `rlang::abort()`, force all execution to terminate
+- Warnings - raised by `warning()` or `rlang::warn()`, display potential problems
+- Messages - raised by `message()` or `rlang::inform()`, gives informative output
+
+---
+
+## Condition Handling
+
+Consider an example function, `my_sqrt()` that raises an error when a negative number is input:
+
+```{r}
+my_sqrt <- function(x){
+  if((x) < 0) {
+    stop("x must be positive")
+  } else {
+    sqrt(x)
+  }
+}
 ```
+
+```{r, include = FALSE, eval = FALSE}
+my_sqrt(-1)
+```
+
+![](sqrt-error.png)
+
+This is a straightforward error, but it could be more detailed, specifically stating what the value of x passed in was.
+
+---
+
+## Condition Handling
+
+`tryCatch` is a way to inspect condition objects and control what happens when a condition is signaled.  Let's define an error handler to decide what happens when `my_sqrt()` fails.  
+
+```{r}
+sqrt_cnd <- tryCatch(error = function(cnd) cnd, my_sqrt(-1))
+str(sqrt_cnd)
+```
+
+The resulting object is a list that contains the condition/error returned as well as the function call that raised the error.
+
+---
+
+## Conditions with a chain of functions
+
+In practice, we usually write functions that call other functions and it can get confusing if there isn't an easy way to find the source of the error in nested functions.  Let's define two functions as an example:
+
+```{r}
+## define get_val() to simulate random input values,
+## raise an error if negative
+get_val <- function(){
+  val <- runif(1, -10, 10)
+  if (val < 1){
+    stop("Can't get val")
+  } else {
+    val
+  }
+}
+
+## define mult_val() which calls get_val() 
+## and multiplies by 2 by default
+mult_val <- function(mult_by = 2){
+  x <- get_val()
+  x*mult_by
+}
+```
+
+---
+
+## Conditions with a chain of functions
+
+If `val` is negative in `get_val()` the same error is thrown in both functions.  
+
+```{r, eval = FALSE, include = FALSE}
+get_val()
+mult_val()
+```
+
+![](val-error.png)
+
+Note that the condition returned shows no info about the value of `val` that caused the error.  How can we write more detailed messages when this error is thrown?
+
+---
+
+## Conditions in `rlang`
+
+`rlang`'s condition functions make it very easy to add the type of custom metadata we want returned in our conditions.  To show this, let's modify `get_val()` to use `rlang::abort()` instead of `stop()`.
+
+```{r}
+get_val <- function(){
+  val <- runif(1, -10, 10)
+  if (val < 1){
+    rlang::abort(message = "Can't get val", 
+                 .subclass ="get_val_error", 
+                 val = val)
+  } else {
+    val
+  }
+}
+```
+
+Note there are three arguments passed to `rlang::abort()`:
+- `message`: the error message which is similar to the one passed to stop() in the previous example.
+- `.subclass`: a subclass of the condition to differentiate errors.
+- `val`: the particular value that caused the error.
+
+---
+
+## Conditions in `rlang`
+
+Now use `tryCatch()` again to inspect the custom condition:
+
+```{r}
+## define an error handler to return the custom error object 
+custom_cnd <- tryCatch(error = function(cnd) cnd, get_val())
+
+## inspect custom_cnd
+str(custom_cnd, max.level = 1)
+```
+
+We see the metadata value of `val` as well as the subclass is captured in the function that uses `rlang::abort()`. 
+
+---
+
+## Conditions in `rlang`
+
+Now we can use this to get a more precise message when we call `mult_val()` which calls this function, something like this:
+
+“Can’t calculate value because `get_val()` raised an error as `val` was negative (-1.74)”
+
+We can define an error handler `get_val_handler()` to access the values returned in the custom error object thrown by `get_val()` then return a message based on these values.
+
+```{r}
+## define an error handler to modify the message
+get_val_handler <- function(cnd) {
+  msg <- "Can't calculate value"
+  if (inherits(cnd, "get_val_error")) {
+    msg <- paste0(msg, " as `val` passed to `get_val()` equals (", cnd$val,")")
+  }
+  rlang::abort(msg, "mult_val_error")
+}
+```
+
+---
+
+## Conditions in `rlang`
+
+Now if we use `get_val_handler` with `get_val()` inside `mult_val()`, we can see an example of the modified error message including the value of `val` that caused the error:
+
+```{r}
+## use get_val_handler() with mult_val()
+mult_val <- function(mult_by = 2){
+  x <- tryCatch(error = get_val_handler, get_val())
+  x*mult_by
+}
+```
+
+![](mult-val-error.png)
 
 ---
 
@@ -107,3 +334,4 @@ browser()
 - [Debugging, condition handling, and defensive programming by Hadley Wickham](http://adv-r.had.co.nz/Exceptions-Debugging.html)
 - [Error Handling and Generation chapter in _Mastering Software Development in R_](https://bookdown.org/rdpeng/RProgDA/error-handling-and-generation.html) 
 - [RStudio Support Debugging Documentation](https://support.rstudio.com/hc/en-us/articles/205612627-Debugging-with-RStudio)
+- [Handling R errors the rlang way](https://www.onceupondata.com/2018/09/28/handling-r-errors/)
